@@ -40,8 +40,13 @@ def client():
 @st.cache_data(ttl=60, show_spinner=False)
 def objets_en_vente():
     return client().table("objets").select(
-        "id, code_vg, titre, description, categorie, etat, defauts, prix_vente, est_appareil, photos, statut, created_at"
+        "id, code_vg, titre, description, categorie, etat, defauts, prix_vente, est_appareil, photos, statut, created_at, ville_id"
     ).in_("statut", ["publie", "reserve"]).order("created_at", desc=True).execute().data
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def liste_villes():
+    return client().table("villes").select("id, nom").order("nom").execute().data
 
 
 def fcfa(n):
@@ -105,6 +110,14 @@ with onglet_acheter:
         st.error("La vitrine est momentanément indisponible. Réessayez dans un instant, "
                  f"ou écrivez-nous sur WhatsApp au {NUMERO_AFFICHE}.")
     if objets is not None:
+        try:
+            villes = liste_villes()
+        except Exception:
+            villes = []
+        noms_villes = {v["id"]: v["nom"] for v in villes}
+        ville_choisie = st.selectbox("📍 Ville", [None] + [v["id"] for v in villes],
+                                     format_func=lambda i: "Toutes les villes" if i is None else noms_villes[i]) \
+            if len(villes) > 1 else None
         recherche = st.text_input("Rechercher", placeholder="Ex. : télé, frigo, uniforme…",
                                   label_visibility="collapsed")
         cat = st.selectbox("Catégorie", list(CATEGORIES), format_func=CATEGORIES.get)
@@ -115,6 +128,7 @@ with onglet_acheter:
         liste = [
             o for o in objets
             if (cat == "tout" or o["categorie"] == cat)
+            and (ville_choisie is None or o.get("ville_id") == ville_choisie)
             and (not mot or mot in f"{o['titre']} {o.get('description') or ''} {o['code_vg']}".lower())
         ]
         if tri == "Prix croissant":
@@ -142,7 +156,8 @@ with onglet_acheter:
                     etat = ETATS.get(o["etat"], o["etat"])
                     if o.get("defauts") and o["defauts"].strip().lower() not in ("neant", "néant", "aucun", "rien"):
                         etat += f" — {o['defauts']}"
-                    st.caption(f"{etat} · garanti {'7 jours' if o['est_appareil'] else '48 h'}")
+                    lieu = f" · 📍 {noms_villes[o['ville_id']]}" if len(villes) > 1 and o.get("ville_id") in noms_villes else ""
+                    st.caption(f"{etat} · garanti {'7 jours' if o['est_appareil'] else '48 h'}{lieu}")
                     if o.get("description"):
                         with st.expander("Détails"):
                             st.write(o["description"])
@@ -162,6 +177,11 @@ with onglet_vendre:
     with st.form("vendre", clear_on_submit=True):
         nom = st.text_input("Votre nom")
         tel = st.text_input("Votre numéro WhatsApp", placeholder="07 00 00 00 00")
+        try:
+            _villes = liste_villes()
+        except Exception:
+            _villes = []
+        ville_v = st.selectbox("Votre ville", _villes, format_func=lambda v: v["nom"]) if _villes else None
         quartier = st.text_input("Votre quartier")
         categorie = st.selectbox("Catégorie", [c for c in CATEGORIES if c != "tout"], format_func=CATEGORIES.get)
         objet = st.text_area("L'objet (marque, état, depuis quand…)", max_chars=500)
@@ -175,6 +195,7 @@ with onglet_vendre:
             try:
                 client().table("propositions").insert({
                     "type": "vendre", "nom": nom.strip(), "telephone": tel_ok.strip(),
+                    "ville_id": ville_v["id"] if ville_v else None,
                     "quartier": quartier.strip() or None, "categorie": categorie,
                     "texte": objet.strip(), "prix": int(prix) or None,
                 }, returning=ReturnMethod.minimal).execute()  # le public envoie sans relire
@@ -191,6 +212,11 @@ with onglet_cherche:
     with st.form("cherche", clear_on_submit=True):
         nom2 = st.text_input("Votre nom", key="nom2")
         tel2 = st.text_input("Votre numéro WhatsApp", placeholder="07 00 00 00 00", key="tel2")
+        try:
+            _villes2 = liste_villes()
+        except Exception:
+            _villes2 = []
+        ville_c = st.selectbox("Votre ville", _villes2, format_func=lambda v: v["nom"], key="ville2") if _villes2 else None
         categorie2 = st.selectbox("Catégorie", [c for c in CATEGORIES if c != "tout"],
                                   format_func=CATEGORIES.get, key="cat2")
         cherche = st.text_area("Ce que vous cherchez", placeholder="Ex. : un frigo qui marche bien", max_chars=500)
@@ -204,6 +230,7 @@ with onglet_cherche:
             try:
                 client().table("propositions").insert({
                     "type": "cherche", "nom": nom2.strip(), "telephone": tel_ok2.strip(),
+                    "ville_id": ville_c["id"] if ville_c else None,
                     "categorie": categorie2, "texte": cherche.strip(), "prix": int(budget) or None,
                 }, returning=ReturnMethod.minimal).execute()  # le public envoie sans relire
                 st.success("C'est noté ! Nous vous prévenons sur WhatsApp dès que nous trouvons.")
