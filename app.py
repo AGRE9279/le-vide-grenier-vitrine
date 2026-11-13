@@ -12,7 +12,7 @@ from postgrest.types import ReturnMethod
 from supabase import create_client
 
 ICONE = Path(__file__).with_name("logo_icone_vitrine.png")
-FOND = "#2E7D32"  # vert = vitrine (rouge = garant, bleu = équipe)
+FOND = "#2E7D32"  # intérieur de la maison : vert = vitrine (rouge = garant, bleu = équipe)
 st.set_page_config(page_title="Blackist — Bonnes affaires vérifiées et garanties",
                    page_icon=str(ICONE) if ICONE.exists() else "🏠", layout="centered")
 
@@ -64,11 +64,11 @@ def lien_whatsapp(texte):
 
 MARQUE = (
     '<svg width="{t}" height="{t}" viewBox="0 0 140 126" role="img" aria-label="Logo Blackist">'
-    '<path d="M8 58 L70 10 L132 58" fill="none" stroke="#FFFFFF" stroke-width="12" '
+    f'<path d="M8 58 L70 10 L132 58" fill="none" stroke="{ORANGE}" stroke-width="12" '
     'stroke-linecap="round" stroke-linejoin="round"/>'
-    '<rect x="24" y="52" width="92" height="66" rx="10" fill="#FFFFFF"/>'
+    f'<rect x="24" y="52" width="92" height="66" rx="10" fill="{FOND}"/>'
     '<text x="70" y="102" text-anchor="middle" font-family="\'Baloo 2\', sans-serif" font-weight="800" '
-    f'font-size="46" fill="{FOND}">BK</text></svg>'
+    'font-size="46" fill="#FFFFFF">BK</text></svg>'
 )
 
 st.markdown(
@@ -84,11 +84,11 @@ st.markdown(
 
 # ---------- En-tête ----------
 st.markdown(
-    f'<div style="display:inline-flex;align-items:center;gap:14px;background:{FOND};border-radius:16px;padding:10px 20px 10px 14px">'
+    '<div style="display:flex;align-items:center;gap:14px">'
     + MARQUE.format(t=64)
     + '<div style="line-height:1">'
-    f'<div style="font-family:\'Baloo 2\',sans-serif;font-weight:800;font-size:34px;color:#FFFFFF">Blackist</div>'
-    '<div style="font-weight:600;font-size:11px;letter-spacing:2px;color:#FFE9D2;margin-top:4px">'
+    f'<div style="font-family:\'Baloo 2\',sans-serif;font-weight:800;font-size:34px;color:{BLEU}">Blackist</div>'
+    '<div style="font-weight:600;font-size:11px;letter-spacing:2px;color:#9A4A06;margin-top:4px">'
     'LES BONNES AFFAIRES D’OCCASION</div></div></div>',
     unsafe_allow_html=True,
 )
