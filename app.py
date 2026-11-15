@@ -7,7 +7,11 @@ Lecture seule sur les objets publiés ; aucune donnée sensible n'est accessible
 from pathlib import Path
 from urllib.parse import quote
 
+import io
+import uuid
+
 import streamlit as st
+from PIL import Image, ImageOps
 from postgrest.types import ReturnMethod
 from supabase import create_client
 
@@ -60,6 +64,15 @@ def lien_commande(code):
 
 def lien_whatsapp(texte):
     return f"https://wa.me/{NUMERO_WHATSAPP}?text={quote(texte)}"
+
+
+def photo_compressee(fichier):
+    """Redresse, réduit à 1280 px et compresse en JPEG (moins de données mobiles)."""
+    img = ImageOps.exif_transpose(Image.open(fichier)).convert("RGB")
+    img.thumbnail((1280, 1280))
+    tampon = io.BytesIO()
+    img.save(tampon, format="JPEG", quality=78, optimize=True)
+    return tampon.getvalue()
 
 
 MARQUE = (
@@ -187,22 +200,39 @@ with onglet_vendre:
         categorie = st.selectbox("Catégorie", [c for c in CATEGORIES if c != "tout"], format_func=CATEGORIES.get)
         objet = st.text_area("L'objet (marque, état, depuis quand…)", max_chars=500)
         prix = st.number_input("Prix souhaité (FCFA)", min_value=0, step=500)
+        photos_v = st.file_uploader("📸 Photos de l'objet (jusqu'à 3, facultatif)", type=["jpg", "jpeg", "png", "webp"],
+                                    accept_multiple_files=True)
         envoye = st.form_submit_button("Envoyer ma proposition", type="primary")
     if envoye:
         tel_ok = "".join(ch for ch in tel if ch.isdigit() or ch in " +")
         if len(nom.strip()) < 2 or len(tel_ok.replace(" ", "")) < 8 or len(objet.strip()) < 3:
             st.error("Indiquez votre nom, un numéro WhatsApp valide et une description de l'objet.")
         else:
+            chemins, photo_ratee = [], False
+            if photos_v:
+                with st.spinner("Envoi des photos…"):
+                    for f in photos_v[:3]:
+                        try:
+                            chemin = f"p/{uuid.uuid4().hex}.jpg"
+                            client().storage.from_("photos-propositions").upload(
+                                chemin, photo_compressee(f), {"content-type": "image/jpeg"})
+                            chemins.append(chemin)
+                        except Exception:
+                            photo_ratee = True
             try:
                 client().table("propositions").insert({
                     "type": "vendre", "nom": nom.strip(), "telephone": tel_ok.strip(),
                     "ville_id": ville_v["id"] if ville_v else None,
                     "quartier": quartier.strip() or None, "categorie": categorie,
                     "texte": objet.strip(), "prix": int(prix) or None,
+                    "photos": chemins or None,
                 }, returning=ReturnMethod.minimal).execute()  # le public envoie sans relire
-                st.success("Merci ! Votre proposition est bien reçue. Nous vous contactons sur WhatsApp.")
-                st.link_button("📸 Envoyer maintenant une photo de l'objet sur WhatsApp",
-                               lien_whatsapp(f"Bonjour, je viens de proposer un objet à vendre ({objet.strip()[:60]}). Voici la photo :"))
+                st.success("Merci ! Votre proposition est bien reçue"
+                           + (f", avec {len(chemins)} photo(s)" if chemins else "")
+                           + ". Nous vous contactons sur WhatsApp.")
+                if photo_ratee or not chemins:
+                    st.link_button("📸 Envoyer une photo de l'objet sur WhatsApp",
+                                   lien_whatsapp(f"Bonjour, je viens de proposer un objet à vendre ({objet.strip()[:60]}). Voici la photo :"))
             except Exception:
                 st.error(f"L'envoi n'a pas marché. Écrivez-nous directement sur WhatsApp au {NUMERO_AFFICHE}.")
 
