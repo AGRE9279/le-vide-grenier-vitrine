@@ -60,9 +60,11 @@ def fcfa(n):
 
 def lien_commande(o, ville=""):
     """Message de commande complet, déjà écrit : le client n'a qu'à toucher « Envoyer » dans WhatsApp."""
-    texte = (f"Bonjour Blackist 👋, je veux acheter cet objet :\n"
-             f"🏷️ {o['code_vg']} – {o['titre']}\n"
-             f"💰 {fcfa(o['prix_vente'])}" + (f"\n📍 {ville}" if ville else "")
+    # Pas d'emoji : certains WhatsApp (Web, anciens téléphones) les affichent en « ? »
+    texte = (f"Bonjour Blackist, je veux acheter cet objet :\n"
+             f"- Code : {o['code_vg']}\n"
+             f"- Objet : {o['titre'].strip()}\n"
+             f"- Prix : {fcfa(o['prix_vente'])}" + (f"\n- Ville : {ville}" if ville else "")
              + "\nEst-il toujours disponible ?")
     return f"https://wa.me/{NUMERO_WHATSAPP}?text={quote(texte)}"
 
