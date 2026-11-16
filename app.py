@@ -58,8 +58,13 @@ def fcfa(n):
     return f"{int(n or 0):,} FCFA".replace(",", " ")
 
 
-def lien_commande(code):
-    return f"https://wa.me/{NUMERO_WHATSAPP}?text={quote('Bonjour, je veux ' + code)}"
+def lien_commande(o, ville=""):
+    """Message de commande complet, déjà écrit : le client n'a qu'à toucher « Envoyer » dans WhatsApp."""
+    texte = (f"Bonjour Blackist 👋, je veux acheter cet objet :\n"
+             f"🏷️ {o['code_vg']} – {o['titre']}\n"
+             f"💰 {fcfa(o['prix_vente'])}" + (f"\n📍 {ville}" if ville else "")
+             + "\nEst-il toujours disponible ?")
+    return f"https://wa.me/{NUMERO_WHATSAPP}?text={quote(texte)}"
 
 
 def lien_whatsapp(texte):
@@ -180,8 +185,9 @@ with onglet_acheter:
                     if reserve:
                         st.button("Déjà réservé", disabled=True, key=f"r{o['id']}", width="stretch")
                     else:
-                        st.link_button("📲 Commander sur WhatsApp", lien_commande(o["code_vg"]),
+                        st.link_button("📲 Commander sur WhatsApp", lien_commande(o, noms_villes.get(o.get("ville_id"), "")),
                                        type="primary", width="stretch")
+                        st.caption("Un seul clic : le message est déjà écrit, touchez juste « Envoyer » dans WhatsApp.")
 
 # ---------- Vendre ----------
 with onglet_vendre:
