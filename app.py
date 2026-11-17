@@ -42,7 +42,7 @@ def client():
     return create_client(URL, KEY)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=20, show_spinner=False)
 def objets_en_vente():
     return client().table("objets").select(
         "id, code_vg, titre, description, categorie, etat, defauts, prix_vente, est_appareil, photos, statut, created_at, ville_id"
@@ -97,6 +97,7 @@ st.markdown(
     ".vg-garantie{background:#EEF3F9;border-radius:12px;padding:10px 14px;font-size:15px;margin:6px 0 14px}"
     ".vg-prix{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:24px;color:#14365A;line-height:1.1}"
     ".vg-code{font-size:12px;color:#5A6472;letter-spacing:1px}"
+    ".vg-reserve{background:#F08A24;color:#14365A;font-weight:700;text-align:center;border-radius:8px;padding:6px 10px;margin-bottom:6px;letter-spacing:.5px}"
     ".vg-badge{display:inline-block;background:#FDE7D1;color:#8A3F00;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}"
     "</style>",
     unsafe_allow_html=True,
@@ -157,7 +158,8 @@ with onglet_acheter:
         elif tri == "Prix décroissant":
             liste.sort(key=lambda o: -(o["prix_vente"] or 0))
 
-        st.caption(f"{len(liste)} objet(s) disponible(s)")
+        nb_res = sum(1 for o in liste if o["statut"] == "reserve")
+        st.caption(f"{len(liste) - nb_res} objet(s) disponible(s)" + (f" · {nb_res} réservé(s)" if nb_res else ""))
         if not liste:
             st.info("Aucun objet ne correspond pour le moment. Dites-nous ce que vous cherchez "
                     "dans l'onglet « 🔎 Je cherche… » : on vous prévient dès qu'il arrive.")
@@ -166,9 +168,11 @@ with onglet_acheter:
             colonnes = st.columns(2)
             for col, o in zip(colonnes, liste[i:i + 2]):
                 with col, st.container(border=True):
+                    reserve = o["statut"] == "reserve"
+                    if reserve:
+                        st.markdown('<div class="vg-reserve">🔒 RÉSERVÉ · commande en cours</div>', unsafe_allow_html=True)
                     if o.get("photos"):
                         st.image(o["photos"][0], width="stretch")
-                    reserve = o["statut"] == "reserve"
                     st.markdown(f'<div class="vg-code">{o["code_vg"]}'
                                 + (' &nbsp;<span class="vg-badge">Réservé</span>' if reserve else "")
                                 + "</div>", unsafe_allow_html=True)
@@ -185,7 +189,10 @@ with onglet_acheter:
                             if len(o.get("photos") or []) > 1:
                                 st.image(o["photos"][1:], width=120)
                     if reserve:
-                        st.button("Déjà réservé", disabled=True, key=f"r{o['id']}", width="stretch")
+                        st.button("🔒 Déjà réservé par un client", disabled=True, key=f"r{o['id']}", width="stretch")
+                        st.link_button("🔔 Me prévenir s'il se libère", lien_whatsapp(
+                            f"Bonjour Blackist, l'objet {o['code_vg']} ({o['titre'].strip()}) est réservé. "
+                            "Pouvez-vous me prévenir s'il se libère ?"), width="stretch")
                     else:
                         st.link_button("📲 Commander sur WhatsApp", lien_commande(o, noms_villes.get(o.get("ville_id"), "")),
                                        type="primary", width="stretch")
